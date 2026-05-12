@@ -1,0 +1,37 @@
+{
+  "name": "@den/pi",
+  "version": "0.1.0",
+  "description": "Den-aware Pi extensions, Pi-side packet helpers, and reusable worker-session utilities.",
+  "type": "module",
+  "private": true,
+  "files": [
+    "extensions/**/*.ts",
+    "lib/**/*.ts",
+    "skills/**/*.md",
+    "docs/**/*.md"
+  ],
+  "scripts": {
+    "build": "node scripts/verify-artifacts.mjs",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts",
+    "lint": "node scripts/verify-artifacts.mjs"
+  },
+  "exports": {
+    "./lib/*": "./lib/*.ts",
+    "./extensions/*": "./extensions/*.ts",
+    "./skills/den-orchestrator": "./skills/den-orchestrator/SKILL.md"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/den.ts",
+      "./extensions/den-subagent.ts",
+      "./extensions/exit-alias.ts",
+      "./extensions/pi-powerline-footer/index.ts"
+    ],
+    "skills": [
+      "./skills/den-orchestrator/SKILL.md"
+    ]
+  }
+}
