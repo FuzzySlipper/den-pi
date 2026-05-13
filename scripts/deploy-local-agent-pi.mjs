@@ -16,6 +16,7 @@ const settingsPath = process.env.PI_SETTINGS_PATH
   : join(agentDir, "settings.json");
 const extensionsDir = join(agentDir, "extensions");
 const skillsDir = join(agentDir, "skills");
+const libDir = join(agentDir, "lib");
 
 function log(message) {
   console.log(`${dryRun ? "[dry-run] " : ""}${message}`);
@@ -127,6 +128,7 @@ log(`Pi agent dir: ${agentDir}`);
 ensureDir(agentDir);
 ensureDir(extensionsDir);
 ensureDir(skillsDir);
+replaceSymlink(assertArtifact("./lib"), libDir);
 
 for (const rel of extensions) {
   const artifact = assertArtifact(rel);
