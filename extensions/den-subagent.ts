@@ -2389,21 +2389,28 @@ async function appendOps(
   eventType: string,
   options: { taskId?: number; body: string; metadata: JsonObject; dedupKey?: string },
 ) {
-  return denFetch(cfg, `/api/projects/${esc(cfg.projectId)}/agent-stream/ops`, {
-    method: "POST",
-    body: {
-      sender: cfg.agent,
-      sender_instance_id: cfg.instanceId,
-      event_type: eventType,
-      task_id: options.taskId,
-      recipient_agent: cfg.agent,
-      recipient_role: cfg.role,
-      delivery_mode: "record_only",
-      body: options.body,
-      metadata: JSON.stringify(options.metadata),
-      dedup_key: options.dedupKey,
-    },
-  });
+  try {
+    return await denFetch(cfg, `/api/projects/${esc(cfg.projectId)}/agent-stream/ops`, {
+      method: "POST",
+      body: {
+        sender: cfg.agent,
+        sender_instance_id: cfg.instanceId,
+        event_type: eventType,
+        task_id: options.taskId,
+        recipient_agent: cfg.agent,
+        recipient_role: cfg.role,
+        delivery_mode: "record_only",
+        body: options.body,
+        metadata: JSON.stringify(options.metadata),
+        dedup_key: options.dedupKey,
+      },
+    });
+  } catch {
+    // Ops stream projection is best-effort; local sub-agent execution and
+    // durable task-thread packets must not fail just because the operator
+    // telemetry route is unavailable or older than this extension.
+    return undefined;
+  }
 }
 
 async function appendPacketLifecycleOps(
