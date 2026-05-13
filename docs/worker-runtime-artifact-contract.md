@@ -57,6 +57,28 @@ For deployed worker hosts, prefer one of:
 
 The worker runtime should record the consumed `den-pi` git commit or package version in worker launch metadata/status so Pi session behavior is reproducible.
 
+## Local agent deployment helper
+
+For den-k8plus local agent use, `den-pi` provides a helper that registers this checkout as the live Pi package root for the Unix `agent` account and creates symlinks into the profile-local Pi discovery directories:
+
+```bash
+npm run deploy:local
+```
+
+The helper defaults to `~/.pi/agent` for the current Unix user, so run it as the same account that launches Pi (`agent` on den-k8plus), for example:
+
+```bash
+sudo -n runuser -u agent -- bash -lc 'cd /home/dev/den-pi && npm run deploy:local'
+```
+
+It performs three operations:
+
+1. verifies every `package.json.pi.extensions` and `package.json.pi.skills` artifact exists;
+2. symlinks extension files/directories and skill directories into `~/.pi/agent/extensions/` and `~/.pi/agent/skills/`;
+3. ensures `~/.pi/agent/settings.json` has `/home/dev/den-pi` in `packages` and removes the stale pre-split `den-mcp/pi-dev` package path.
+
+Use `npm run deploy:local -- --dry-run` to preview changes. Do not edit or copy hidden live Pi extension/skill copies by hand; update this repo and rerun the helper.
+
 ## Runtime-provided inputs
 
 `den-pi` code may read bounded worker/session metadata from environment variables and state files provided by Den Core / Worker Runtime. The exact names may evolve, but the boundary is:

@@ -13,7 +13,8 @@
   "scripts": {
     "build": "node scripts/verify-artifacts.mjs",
     "test": "node --experimental-strip-types --test tests/**/*.test.ts",
-    "lint": "node scripts/verify-artifacts.mjs"
+    "lint": "node scripts/verify-artifacts.mjs",
+    "deploy:local": "node scripts/deploy-local-agent-pi.mjs"
   },
   "exports": {
     "./lib/*": "./lib/*.ts",
