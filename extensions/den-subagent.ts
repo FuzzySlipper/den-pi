@@ -1700,7 +1700,8 @@ async function runDenSubagent(
 
   // Post implementation packet for successful coder runs.
   if (
-    effectiveOptions.taskId !== undefined
+    shouldPostResult
+    && effectiveOptions.taskId !== undefined
     && subagentSucceeded(result)
     && effectiveOptions.role.toLowerCase() === "coder"
     && result.final_output
@@ -2443,7 +2444,7 @@ async function appendPacketLifecycleOps(
 
 async function sendTaskMessage(cfg: DenConfig, taskId: number, content: string, metadata: JsonObject) {
   const intent = resolveIntentFromMetadata(metadata);
-  return denFetch(cfg, `/api/projects/${esc(cfg.projectId)}/messages`, {
+  return denFetch(cfg, `/api/projects/${esc(cfg.projectId)}/messages/`, {
     method: "POST",
     body: {
       sender: cfg.agent,
