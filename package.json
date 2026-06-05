@@ -29,7 +29,8 @@
       "./extensions/den.ts",
       "./extensions/den-subagent.ts",
       "./extensions/exit-alias.ts",
-      "./extensions/pi-powerline-footer/index.ts"
+      "./extensions/pi-powerline-footer/index.ts",
+      "./extensions/lemonade.ts"
     ],
     "skills": [
       "./skills/den-orchestrator/SKILL.md"
