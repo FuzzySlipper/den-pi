@@ -30,7 +30,8 @@
       "./extensions/den-subagent.ts",
       "./extensions/exit-alias.ts",
       "./extensions/pi-powerline-footer/index.ts",
-      "./extensions/lemonade.ts"
+      "./extensions/lemonade.ts",
+      "./extensions/den-router.ts"
     ],
     "skills": [
       "./skills/den-orchestrator/SKILL.md"

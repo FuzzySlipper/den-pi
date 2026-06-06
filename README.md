@@ -10,6 +10,8 @@ Den-aware extensions and reusable Pi-side helpers for worker sessions.
 - `extensions/den-subagent.ts` — Pi-side subagent/coder/reviewer helper tools.
 - `extensions/exit-alias.ts` — Pi exit alias convenience extension.
 - `extensions/pi-powerline-footer/` — powerline-style footer/status extension.
+- `extensions/lemonade.ts` — discovers Lemonade models at startup and registers them with Pi.
+- `extensions/den-router.ts` — discovers den-router models at startup and registers them with Pi (`DEN_ROUTER_URL`, default `http://127.0.0.1:18082`).
 - `lib/` — Pi-side Den packet, subagent, collaboration, context, and cleanup helpers.
 - `skills/den-orchestrator/SKILL.md` — generic Den orchestrator skill content for Pi sessions.
 
