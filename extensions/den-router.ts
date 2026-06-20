@@ -20,11 +20,21 @@ const DEFAULT_URL = "http://127.0.0.1:18082";
 //   forwards to the backend's /v1/chat/completions unchanged.
 type DenRouterBackendType = "standard" | "codex-oauth" | string;
 
+// Fallback context window (in tokens) used when den-router does not
+// report a context_length for a model. Keeps behavior stable for models
+// whose router config has no context_length set at any level.
+export const DEFAULT_CONTEXT_WINDOW = 128000;
+
 export interface DenRouterModel {
   id: string;
   object?: string;
   created?: number;
   owned_by?: string;
+  // context_length is the effective context window den-router derives
+  // from its config (model-level → backend-level → router default) and
+  // exposes on each /v1/models entry. Omitted (or <= 0) when unknown;
+  // in that case we fall back to DEFAULT_CONTEXT_WINDOW.
+  context_length?: number;
 }
 
 interface DenRouterModelsResponse {
@@ -108,6 +118,15 @@ export function isCodexBacked(
   return entry.backends.some((b) => b && b.type === "codex-oauth");
 }
 
+// Map den-router's /v1/models payload into Pi provider model configs.
+//
+// context_length flows from the model entry into Pi's contextWindow:
+//   - When den-router reports a positive context_length (derived from
+//     model-level, backend-level, or router-default config), we use it.
+//   - When the field is absent or non-positive (model with no
+//     context_length configured anywhere), we fall back to
+//     DEFAULT_CONTEXT_WINDOW so previously-working models keep the
+//     same effective window.
 export function toProviderModels(
   data: DenRouterModel[],
   routes: DenRouterRoutesResponse | null = null,
@@ -126,12 +145,23 @@ export function toProviderModels(
       // via a follow-up registerProvider call.
       reasoning: api === "openai-responses",
       input: ["text"] as ("text" | "image")[],
-      contextWindow: 128000,
+      contextWindow: resolveContextWindow(model),
       maxTokens: 32768,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       api,
     } satisfies ProviderModelConfig];
   });
+}
+
+// resolveContextWindow returns the effective context window for a model.
+// It prefers den-router's reported context_length when present and
+// positive, otherwise falls back to DEFAULT_CONTEXT_WINDOW.
+export function resolveContextWindow(model: DenRouterModel): number {
+  const reported = model.context_length;
+  if (typeof reported === "number" && Number.isFinite(reported) && reported > 0) {
+    return reported;
+  }
+  return DEFAULT_CONTEXT_WINDOW;
 }
 
 // Minimal structural type for the model shape we emit. We avoid

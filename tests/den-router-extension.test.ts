@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import denRouter, {
+  DEFAULT_CONTEXT_WINDOW,
   denRouterServerUrl,
   fetchDenRouterModels,
   fetchDenRouterRoutes,
   isCodexBacked,
+  resolveContextWindow,
   toProviderModels,
 } from "../extensions/den-router.ts";
 import type {
@@ -151,6 +153,33 @@ test("toProviderModels falls back to openai-completions when routes is null", ()
   assert.equal(models[1].api, "openai-completions");
 });
 
+test("resolveContextWindow uses den-router context_length and falls back otherwise", () => {
+  assert.equal(resolveContextWindow({ id: "a", context_length: 32768 }), 32768);
+  assert.equal(resolveContextWindow({ id: "a", context_length: 1000000 }), 1000000);
+  // Absent / unknown → fallback
+  assert.equal(resolveContextWindow({ id: "a" }), DEFAULT_CONTEXT_WINDOW);
+  // Non-positive values (den-router sends these as omitted, but be defensive)
+  assert.equal(resolveContextWindow({ id: "a", context_length: 0 }), DEFAULT_CONTEXT_WINDOW);
+  assert.equal(resolveContextWindow({ id: "a", context_length: -1 }), DEFAULT_CONTEXT_WINDOW);
+  // Malformed non-number should not throw; falls back.
+  assert.equal(resolveContextWindow({ id: "a", context_length: "oops" as any }), DEFAULT_CONTEXT_WINDOW);
+});
+
+test("toProviderModels applies den-router context_length to contextWindow", () => {
+  const models = toProviderModels([
+    { id: "big-local",   context_length: 200000 },
+    { id: "fast-local",  context_length: 32768 },
+    { id: "unconfigured" /* no context_length */ },
+    { id: "zeroed",      context_length: 0 },
+  ]);
+
+  assert.deepEqual(models.map((m) => m.id), ["big-local", "fast-local", "unconfigured", "zeroed"]);
+  assert.equal(models[0].contextWindow, 200000, "model-level context_length applied");
+  assert.equal(models[1].contextWindow, 32768, "smaller context_length applied");
+  assert.equal(models[2].contextWindow, DEFAULT_CONTEXT_WINDOW, "absent field falls back");
+  assert.equal(models[3].contextWindow, DEFAULT_CONTEXT_WINDOW, "zero context_length falls back");
+});
+
 test("toProviderModels maps den-router model IDs into Pi provider models (legacy call shape)", () => {
   // The original single-argument signature still works for callers
   // that don't have routes available.
@@ -168,6 +197,32 @@ test("toProviderModels maps den-router model IDs into Pi provider models (legacy
   assert.equal(models[0].contextWindow, 128000);
   assert.equal(models[0].maxTokens, 32768);
   assert.deepEqual(models[0].cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+});
+
+test("fetchDenRouterModels reads context_length from /v1/models entries", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({
+      object: "list",
+      data: [
+        { id: "big-local", object: "model", context_length: 200000 },
+        { id: "fast-local", object: "model", context_length: 32768 },
+        { id: "unconfigured", object: "model" },
+      ],
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+
+  try {
+    const models = await fetchDenRouterModels("http://router.local");
+    const mapped = toProviderModels(models);
+    assert.deepEqual(mapped.map((m) => m.id), ["big-local", "fast-local", "unconfigured"]);
+    assert.equal(mapped[0].contextWindow, 200000);
+    assert.equal(mapped[1].contextWindow, 32768);
+    assert.equal(mapped[2].contextWindow, DEFAULT_CONTEXT_WINDOW);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("den-router extension registers provider on startup and on refresh", async () => {
