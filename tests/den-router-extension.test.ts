@@ -7,6 +7,8 @@ import denRouter, {
   fetchDenRouterRoutes,
   isCodexBacked,
   resolveContextWindow,
+  resolveReasoning,
+  resolveThinkingFormat,
   toProviderModels,
 } from "../extensions/den-router.ts";
 import type {
@@ -163,6 +165,83 @@ test("resolveContextWindow uses den-router context_length and falls back otherwi
   assert.equal(resolveContextWindow({ id: "a", context_length: -1 }), DEFAULT_CONTEXT_WINDOW);
   // Malformed non-number should not throw; falls back.
   assert.equal(resolveContextWindow({ id: "a", context_length: "oops" as any }), DEFAULT_CONTEXT_WINDOW);
+});
+
+test("resolveReasoning respects explicit flag, labels, codex, and id heuristic", () => {
+  // Explicit boolean wins in either direction.
+  assert.equal(resolveReasoning({ id: "deepseek", reasoning: true }, false), true);
+  assert.equal(
+    resolveReasoning({ id: "deepseek-r1", reasoning: false }, false),
+    false,
+    "explicit false overrides the id heuristic",
+  );
+
+  // Codex-backed models are reasoning-capable.
+  assert.equal(resolveReasoning({ id: "codex-cli" }, true), true);
+
+  // labels[] containing "reasoning" (lemonade convention).
+  assert.equal(resolveReasoning({ id: "weird-name", labels: ["reasoning"] }, false), true);
+  assert.equal(resolveReasoning({ id: "weird-name", labels: ["vision"] }, false), false);
+
+  // Id heuristic: well-known reasoning families.
+  assert.equal(resolveReasoning({ id: "deepseek-r1" }, false), true);
+  assert.equal(resolveReasoning({ id: "deepseek-reasoner" }, false), true);
+  assert.equal(resolveReasoning({ id: "qwq-32b" }, false), true);
+  assert.equal(resolveReasoning({ id: "qwen3-235b-thinking" }, false), true);
+  assert.equal(resolveReasoning({ id: "kimi-k2-thinking" }, false), true);
+  assert.equal(resolveReasoning({ id: "o3-mini" }, false), true);
+  assert.equal(resolveReasoning({ id: "o1" }, false), true);
+
+  // Conservative: bare / non-reasoning ids are not flagged.
+  assert.equal(resolveReasoning({ id: "deepseek" }, false), false);
+  assert.equal(resolveReasoning({ id: "kimi" }, false), false);
+  assert.equal(resolveReasoning({ id: "local-coder" }, false), false);
+  assert.equal(resolveReasoning({ id: "gpt-4o" }, false), false, "gpt-4o is not o1/o3/o4");
+  assert.equal(resolveReasoning({ id: "unconfigured" }, false), false);
+});
+
+test("toProviderModels surfaces reasoning for capable standard models", () => {
+  const models = toProviderModels([
+    { id: "deepseek-r1" },
+    { id: "qwq-32b" },
+    { id: "kimi-k2-thinking" },
+    { id: "deepseek-chat" },
+    { id: "explicit-off", reasoning: false },
+  ]);
+  const byId = Object.fromEntries(models.map((m) => [m.id, m]));
+  assert.equal(byId["deepseek-r1"].reasoning, true, "flagged via id heuristic");
+  assert.equal(byId["qwq-32b"].reasoning, true);
+  assert.equal(byId["kimi-k2-thinking"].reasoning, true);
+  assert.equal(byId["deepseek-chat"].reasoning, false, "plain chat model is not reasoning");
+  assert.equal(byId["explicit-off"].reasoning, false, "explicit false respected");
+});
+
+test("resolveThinkingFormat narrows to pi-accepted values", () => {
+  // Accepted values pass through.
+  for (const f of ["openai", "openrouter", "deepseek", "together", "zai", "qwen", "qwen-chat-template"]) {
+    assert.equal(resolveThinkingFormat({ id: "m", thinking_format: f }), f);
+  }
+  // Unknown values fall back to undefined so we never emit an invalid
+  // provider model — Pi would then use its per-api default format.
+  assert.equal(resolveThinkingFormat({ id: "m", thinking_format: "nonsense" }), undefined);
+  // Absent / blank / non-string fall back to undefined.
+  assert.equal(resolveThinkingFormat({ id: "m" }), undefined);
+  assert.equal(resolveThinkingFormat({ id: "m", thinking_format: "   " }), undefined);
+});
+
+test("toProviderModels forwards den-router thinking_format as compat.thinkingFormat", () => {
+  const models = toProviderModels([
+    { id: "qwq-local", reasoning: true, thinking_format: "qwen" },
+    { id: "ds-r1", reasoning: true, thinking_format: "deepseek" },
+    { id: "plain", reasoning: false },
+    { id: "bad-format", reasoning: true, thinking_format: "nope" },
+  ]);
+  const byId = Object.fromEntries(models.map((m) => [m.id, m]));
+
+  assert.deepEqual(byId["qwq-local"].compat, { thinkingFormat: "qwen" });
+  assert.deepEqual(byId["ds-r1"].compat, { thinkingFormat: "deepseek" });
+  assert.equal(byId["plain"].compat, undefined, "no thinking_format → no compat block");
+  assert.equal(byId["bad-format"].compat, undefined, "unknown format is dropped, not forwarded");
 });
 
 test("toProviderModels applies den-router context_length to contextWindow", () => {

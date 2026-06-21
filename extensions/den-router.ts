@@ -35,6 +35,19 @@ export interface DenRouterModel {
   // exposes on each /v1/models entry. Omitted (or <= 0) when unknown;
   // in that case we fall back to DEFAULT_CONTEXT_WINDOW.
   context_length?: number;
+  // Optional capability hints den-router may attach to a model entry.
+  // `reasoning: true|false` is an explicit declaration that wins over
+  // every other signal (codex backend, labels, id heuristic). `labels`
+  // mirrors the lemonade extension convention (e.g. ["reasoning","vision"]).
+  reasoning?: boolean;
+  labels?: string[];
+  // thinking_format is the wire convention den-router says this model's
+  // backend expects for enabling thinking (e.g. "qwen", "deepseek",
+  // "together", "openrouter"). Forwarded verbatim into Pi's
+  // compat.thinkingFormat when set; absent means "let Pi default"
+  // (openai-style reasoning_effort, which most OpenAI-compatible
+  // backends accept).
+  thinking_format?: string;
 }
 
 interface DenRouterModelsResponse {
@@ -137,18 +150,26 @@ export function toProviderModels(
     if (!id || seen.has(id)) return [];
     seen.add(id);
     const api = isCodexBacked(id, routes) ? "openai-responses" : "openai-completions";
+    const thinkingFormat = resolveThinkingFormat(model);
     return [{
       id,
       name: id,
-      // Codex models are reasoning-capable (gpt-5.5, gpt-5.x-codex).
-      // Non-codex models default to false; users can override per-model
-      // via a follow-up registerProvider call.
-      reasoning: api === "openai-responses",
+      // Surface Pi's thinking-level control for reasoning-capable models.
+      // See resolveReasoning for the precedence: explicit server flag →
+      // codex backend → labels → conservative id heuristic. Without this,
+      // non-codex models load with reasoning:false and the thinking-level
+      // control never appears.
+      reasoning: resolveReasoning(model, api === "openai-responses"),
       input: ["text"] as ("text" | "image")[],
       contextWindow: resolveContextWindow(model),
       maxTokens: 32768,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       api,
+      // Per-model thinking wire format from den-router (e.g. "qwen",
+      // "deepseek"). Omitted when den-router doesn't declare one, so Pi
+      // falls back to its per-api default (openai-style reasoning_effort
+      // for openai-completions).
+      ...(thinkingFormat ? { compat: { thinkingFormat } } : {}),
     } satisfies ProviderModelConfig];
   });
 }
@@ -164,6 +185,56 @@ export function resolveContextWindow(model: DenRouterModel): number {
   return DEFAULT_CONTEXT_WINDOW;
 }
 
+// REASONING_ID_PATTERN flags well-known reasoning model families by id
+// (DeepSeek-R1/Reasoner, Qwen QwQ/Thinking, Kimi Thinking, OpenAI o1/o3/o4,
+// ...). It is intentionally conservative: a false positive would surface a
+// thinking-level control that does nothing (or push a reasoning_effort a
+// backend rejects), so only unambiguous indicators match. Bare vendor ids
+// ("deepseek", "kimi", ...) are deliberately NOT matched.
+const REASONING_ID_PATTERN =
+  /reasoner|reasoning|thinking|(?:^|[-_/.])qwq|(?:^|[-_/.])r1\d?(?:[-_/.]|$)|(?:^|[-_/.])o[134](?:[-_/.]|$)/i;
+
+// resolveReasoning decides whether a den-router model should expose Pi's
+// thinking-level control. Precedence (first wins):
+//   1. An explicit `reasoning` boolean on the model entry — the server's
+//      own declaration always wins, in either direction.
+//   2. Codex-backed models (gpt-5.x family) are reasoning-capable.
+//   3. A `labels` array containing "reasoning" (lemonade convention).
+//   4. Conservative id heuristic (REASONING_ID_PATTERN).
+//   5. Otherwise false.
+export function resolveReasoning(
+  model: DenRouterModel,
+  codexBacked: boolean,
+): boolean {
+  if (typeof model.reasoning === "boolean") return model.reasoning;
+  if (codexBacked) return true;
+  if (Array.isArray(model.labels) && model.labels.includes("reasoning")) return true;
+  return REASONING_ID_PATTERN.test(model.id ?? "");
+}
+
+// Pi accepts these literal values for compat.thinkingFormat. We restrict
+// the string we forward from den-router to this set so an unknown value
+// can't produce an invalid provider model. Values map 1:1 to den-router's
+// accepted thinking_format values (see den-router config validation).
+const PI_THINKING_FORMATS = new Set([
+  "openai",
+  "openrouter",
+  "deepseek",
+  "together",
+  "zai",
+  "qwen",
+  "qwen-chat-template",
+]);
+
+// resolveThinkingFormat returns the den-router-reported thinking wire
+// format for a model, narrowed to the set Pi accepts, or undefined to let
+// Pi default to openai-style reasoning_effort.
+export function resolveThinkingFormat(model: DenRouterModel): string | undefined {
+  const f = typeof model.thinking_format === "string" ? model.thinking_format.trim() : "";
+  if (!f) return undefined;
+  return PI_THINKING_FORMATS.has(f) ? f : undefined;
+}
+
 // Minimal structural type for the model shape we emit. We avoid
 // importing the pi-coding-agent types here to keep the extension
 // portable; registerProvider accepts a structurally compatible
@@ -177,6 +248,7 @@ interface ProviderModelConfig {
   maxTokens: number;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
   api: string;
+  compat?: { thinkingFormat?: string };
 }
 
 function registerDenRouter(
@@ -191,7 +263,11 @@ function registerDenRouter(
     apiKey: "den-router",
     compat: {
       supportsDeveloperRole: false,
-      supportsReasoningEffort: false,
+      // Forward reasoning_effort so the thinking-level control actually
+      // reaches reasoning-capable backends. This only affects models
+      // marked reasoning: true (others never enable thinking), so
+      // non-reasoning models are unaffected.
+      supportsReasoningEffort: true,
       supportsUsageInStreaming: false,
     },
     models: toProviderModels(models, routes),

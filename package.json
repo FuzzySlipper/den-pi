@@ -31,7 +31,8 @@
       "./extensions/exit-alias.ts",
       "./extensions/pi-powerline-footer/index.ts",
       "./extensions/lemonade.ts",
-      "./extensions/den-router.ts"
+      "./extensions/den-router.ts",
+      "./extensions/rusty-debug-attach.ts"
     ],
     "skills": [
       "./skills/den-orchestrator/SKILL.md"
