@@ -8,7 +8,6 @@ This document defines how `den-worker-runtime` consumes `den-pi` artifacts for P
 
 - Den-aware Pi extensions in `extensions/`.
 - Reusable Pi-side helper libraries in `lib/`.
-- Generic Den orchestrator skill content in `skills/`.
 - Package metadata describing the extension/skill entrypoints.
 
 `den-worker-runtime` owns host-side installation/bundling into worker sessions. It may copy or mount `den-pi` artifacts, but it must not fork hidden implementation copies.
@@ -19,12 +18,9 @@ The repo root is the artifact root. A runtime consumer should expect:
 
 ```text
 package.json
-extensions/den.ts
-extensions/den-subagent.ts
 extensions/exit-alias.ts
 extensions/pi-powerline-footer/index.ts
 lib/*.ts
-skills/den-orchestrator/SKILL.md
 docs/worker-runtime-artifact-contract.md
 ```
 
@@ -34,12 +30,9 @@ docs/worker-runtime-artifact-contract.md
 {
   "pi": {
     "extensions": [
-      "./extensions/den.ts",
-      "./extensions/den-subagent.ts",
       "./extensions/exit-alias.ts",
       "./extensions/pi-powerline-footer/index.ts"
-    ],
-    "skills": ["./skills/den-orchestrator/SKILL.md"]
+    ]
   }
 }
 ```

@@ -7,7 +7,6 @@
   "files": [
     "extensions/**/*.ts",
     "lib/**/*.ts",
-    "skills/**/*.md",
     "docs/**/*.md"
   ],
   "scripts": {
@@ -18,24 +17,18 @@
   },
   "exports": {
     "./lib/*": "./lib/*.ts",
-    "./extensions/*": "./extensions/*.ts",
-    "./skills/den-orchestrator": "./skills/den-orchestrator/SKILL.md"
+    "./extensions/*": "./extensions/*.ts"
   },
   "engines": {
     "node": ">=22"
   },
   "pi": {
     "extensions": [
-      "./extensions/den.ts",
-      "./extensions/den-subagent.ts",
       "./extensions/exit-alias.ts",
       "./extensions/pi-powerline-footer/index.ts",
       "./extensions/lemonade.ts",
       "./extensions/den-router.ts",
       "./extensions/rusty-debug-attach.ts"
-    ],
-    "skills": [
-      "./skills/den-orchestrator/SKILL.md"
     ]
   }
 }

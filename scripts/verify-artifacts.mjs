@@ -1,14 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 
 const requiredPaths = [
-  "extensions/den.ts",
-  "extensions/den-subagent.ts",
   "extensions/exit-alias.ts",
   "extensions/pi-powerline-footer/index.ts",
   "lib/den-packet-intent.ts",
   "lib/den-subagent-pipeline.ts",
   "lib/den-context-status.ts",
-  "skills/den-orchestrator/SKILL.md",
   "docs/worker-runtime-artifact-contract.md",
 ];
 
